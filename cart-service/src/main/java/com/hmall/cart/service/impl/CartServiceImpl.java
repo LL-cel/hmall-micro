@@ -1,6 +1,9 @@
 package com.hmall.cart.service.impl;
 
+import com.hmall.common.utils.UserContext;
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.api.item.ItemClient;
@@ -15,6 +18,7 @@ import com.hmall.cart.mapper.CartMapper;
 import com.hmall.cart.service.ICartService;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
 import java.util.List;
@@ -29,14 +33,14 @@ import java.util.stream.Collectors;
  * @author 黑马程序员
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements ICartService {
     private final ItemClient itemClient;
 
     @Override
     public void addItem2Cart(CartFormDTO cartFormDTO) {
-        // 1.用户服务尚未拆分，暂时使用固定用户 1L
-        var userId = 1L;
+        var userId = UserContext.requireUser();
 
         // 2.判断是否已经存在
         if(checkItemExists(cartFormDTO.getItemId(), userId)){
@@ -57,9 +61,12 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
     }
 
     @Override
+    @SentinelResource(value = "queryMyCarts", blockHandler = "queryMyCartsBlockHandler",
+            fallback = "queryMyCartsFallback")
     public List<CartVO> queryMyCarts() {
+        // cn.hutool.core.thread.ThreadUtil.sleep(2000); // 临时测试：阻塞 2 秒，模拟购物车慢查询
         // 1.查询我的购物车列表
-        var carts = lambdaQuery().eq(Cart::getUserId, 1L).list();
+        var carts = lambdaQuery().eq(Cart::getUserId, UserContext.requireUser()).list();
         if (CollUtils.isEmpty(carts)) {
             return CollUtils.emptyList();
         }
@@ -72,6 +79,16 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
 
         // 4.返回
         return vos;
+    }
+
+    public List<CartVO> queryMyCartsBlockHandler(BlockException e) {
+        log.error("查询购物车被 Sentinel 限流或熔断，返回空集合", e);
+        return CollUtils.emptyList();
+    }
+
+    public List<CartVO> queryMyCartsFallback(Throwable e) {
+        log.error("查询购物车发生异常，触发降级，返回空集合", e);
+        return CollUtils.emptyList();
     }
 
     private void handleCartItems(List<CartVO> vos) {
@@ -97,7 +114,7 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
         // 1.构建删除条件，userId和itemId
         var queryWrapper = new QueryWrapper<Cart>();
         queryWrapper.lambda()
-                .eq(Cart::getUserId, 1L)
+                .eq(Cart::getUserId, UserContext.requireUser())
                 .in(Cart::getItemId, itemIds);
         // 2.删除
         remove(queryWrapper);

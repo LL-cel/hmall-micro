@@ -1,6 +1,9 @@
 package com.hmall.common.utils;
 
+import com.hmall.common.exception.UnauthorizedException;
+
 public class UserContext {
+    public static final String USER_ID_HEADER = "X-User-Id";
     private static final ThreadLocal<Long> tl = new ThreadLocal<>();
 
     /**
@@ -17,6 +20,14 @@ public class UserContext {
      */
     public static Long getUser() {
         return tl.get();
+    }
+
+    public static Long requireUser() {
+        Long userId = getUser();
+        if (userId == null) {
+            throw new UnauthorizedException("未登录");
+        }
+        return userId;
     }
 
     /**

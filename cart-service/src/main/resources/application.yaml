@@ -1,5 +1,5 @@
-server:
-  port: 8082
+#server:
+#  port: 8082
 spring:
   application:
     name: cart-service
@@ -10,6 +10,11 @@ spring:
       password: nacos # 密码
       discovery:
         ip: 192.168.150.1 # 本服务所在机器的ip地址
+    sentinel:
+      transport:
+        dashboard: 192.168.150.88:8858
+        client-ip: 192.168.150.1
+      http-method-specify: true # 开启请求方式前缀可根据http请求方法区分簇点链路
   profiles:
     active: dev
   datasource:
@@ -49,3 +54,6 @@ knife4j:
 feign:
   okhttp:
     enabled: true
+  sentinel:
+    enabled: true # 开启feign对sentinel的支持
+

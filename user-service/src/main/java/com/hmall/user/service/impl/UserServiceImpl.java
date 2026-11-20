@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.common.exception.BadRequestException;
 import com.hmall.common.exception.BizIllegalException;
 import com.hmall.common.exception.ForbiddenException;
+import com.hmall.common.utils.UserContext;
 import com.hmall.user.config.JwtProperties;
 import com.hmall.user.domain.dto.LoginFormDTO;
 import com.hmall.user.domain.po.User;
@@ -71,16 +72,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
     @Override
     public void deductMoney(String pw, Integer totalFee) {
+        var userId = UserContext.requireUser();
         log.info("开始扣款");
         // 1.校验密码
-        var user = getById(1L);
+        var user = getById(userId);
         if(user == null || !passwordEncoder.matches(pw, user.getPassword())){
             // 密码错误
             throw new BizIllegalException("用户密码错误");
         }
 
         // 2.尝试扣款
-        int i = baseMapper.updateMoney(1L, totalFee);
+        int i = baseMapper.updateMoney(userId, totalFee);
         if (i <= 0) {
             throw new RuntimeException("扣款失败，可能是余额不足！");
         }

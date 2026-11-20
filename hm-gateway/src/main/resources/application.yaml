@@ -1,0 +1,51 @@
+server:
+  port: 18088
+
+spring:
+  application:
+    name: hm-gateway
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:192.168.150.88:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        ip: ${NACOS_DISCOVERY_IP:192.168.150.1}
+    gateway:
+      routes:
+        - id: item-service
+          uri: lb://item-service
+          predicates:
+            - Path=/items/**
+          filters:
+            - ItemsLogging
+        - id: item-search
+          uri: lb://item-service
+          predicates:
+            - Path=/search/**
+        - id: cart-service
+          uri: lb://cart-service
+          predicates:
+            - Path=/carts/**
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/users/**,/addresses/**
+        - id: trade-service
+          uri: lb://trade-service
+          predicates:
+            - Path=/orders/**
+        - id: pay-service
+          uri: lb://pay-service
+          predicates:
+            - Path=/pay-orders/**
+
+hm:
+  jwt:
+    public-key-location: ${HM_JWT_PUBLIC_KEY_LOCATION:classpath:hmall-jwt-public.pem}
+  auth:
+    exclude-paths:
+      - /search/**
+      - /users/login
+      - /items/**
+      - /hi

@@ -5,11 +5,13 @@ import com.hmall.api.item.ItemClient;
 import com.hmall.api.item.dto.ItemDTO;
 import com.hmall.api.item.dto.OrderDetailDTO;
 import com.hmall.common.exception.BadRequestException;
+import com.hmall.common.utils.UserContext;
 import com.hmall.trade.domain.dto.OrderFormDTO;
 import com.hmall.trade.domain.po.Order;
 import com.hmall.trade.service.IOrderDetailService;
 import com.hmall.trade.service.impl.OrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -29,6 +31,7 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        UserContext.setUser(42L);
         items = mock(ItemClient.class);
         carts = mock(CartClient.class);
         details = mock(IOrderDetailService.class);
@@ -36,6 +39,11 @@ class OrderServiceTest {
         form = new OrderFormDTO();
         form.setPaymentType(3);
         form.setDetails(List.of(new OrderDetailDTO().setItemId(11L).setNum(2)));
+    }
+
+    @AfterEach
+    void clearUser() {
+        UserContext.removeUser();
     }
 
     private void prepareItemAndPersistence() {
@@ -57,7 +65,7 @@ class OrderServiceTest {
         var order = ArgumentCaptor.forClass(Order.class);
         verify(service).save(order.capture());
         assertEquals(400, order.getValue().getTotalFee());
-        assertEquals(1L, order.getValue().getUserId());
+        assertEquals(42L, order.getValue().getUserId());
         assertEquals(1, order.getValue().getStatus());
         verify(details).saveBatch(argThat(rows -> rows.size() == 1 && rows.stream().allMatch(
                 row -> row.getOrderId().equals(99L) && row.getItemId().equals(11L)

@@ -2,8 +2,10 @@ package com.hmall.trade;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmall.api.cart.CartClient;
+import com.hmall.api.config.UserInfoFeignConfig;
 import com.hmall.api.item.ItemClient;
 import com.hmall.api.item.dto.OrderDetailDTO;
+import com.hmall.common.utils.UserContext;
 import com.sun.net.httpserver.HttpServer;
 import feign.Feign;
 import feign.FeignException;
@@ -28,6 +30,7 @@ class FeignContractTest {
     private HttpServer server;
     private final List<String> requests = new ArrayList<>();
     private final List<String> bodies = new ArrayList<>();
+    private final List<String> userIds = new ArrayList<>();
     private int status = 200;
 
     @BeforeEach
@@ -36,6 +39,7 @@ class FeignContractTest {
         server.createContext("/", exchange -> {
             requests.add(exchange.getRequestMethod() + " " + exchange.getRequestURI());
             bodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            userIds.add(exchange.getRequestHeaders().getFirst(UserContext.USER_ID_HEADER));
             byte[] response = "[{\"id\":11,\"price\":200}]".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, response.length);
@@ -56,6 +60,7 @@ class FeignContractTest {
         return Feign.builder().contract(new SpringMvcContract())
                 .encoder(new SpringEncoder(() -> converters))
                 .decoder(new SpringDecoder(() -> converters))
+                .requestInterceptor(new UserInfoFeignConfig().userInfoFeignInterceptor())
                 .target(type, "http://127.0.0.1:" + server.getAddress().getPort() + path);
     }
 
@@ -79,5 +84,19 @@ class FeignContractTest {
         status = 500;
         assertThrows(FeignException.class, () -> client(ItemClient.class)
                 .deductStock(List.of(new OrderDetailDTO().setItemId(11L).setNum(2))));
+    }
+
+    @Test
+    void forwardsCurrentUserWhenClearingCart() {
+        var carts = client(CartClient.class);
+        UserContext.setUser(42L);
+        try {
+            carts.removeByItemIds(List.of(11L));
+        } finally {
+            UserContext.removeUser();
+        }
+        carts.removeByItemIds(List.of(12L));
+        assertEquals("42", userIds.get(0));
+        assertNull(userIds.get(1));
     }
 }

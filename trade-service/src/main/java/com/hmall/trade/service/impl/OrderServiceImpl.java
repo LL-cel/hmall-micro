@@ -2,6 +2,7 @@ package com.hmall.trade.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.common.exception.BadRequestException;
+import com.hmall.common.utils.UserContext;
 import com.hmall.api.item.dto.ItemDTO;
 import com.hmall.api.item.dto.OrderDetailDTO;
 import com.hmall.trade.domain.dto.OrderFormDTO;
@@ -12,6 +13,7 @@ import com.hmall.api.cart.CartClient;
 import com.hmall.api.item.ItemClient;
 import com.hmall.trade.service.IOrderDetailService;
 import com.hmall.trade.service.IOrderService;
+import io.seata.spring.annotation.GlobalTransactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,8 +40,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private final CartClient cartClient;
 
     @Override
-    @Transactional
+    @GlobalTransactional
     public Long createOrder(OrderFormDTO orderFormDTO) {
+        var userId = UserContext.requireUser();
         // 1.订单数据
         var order = new Order();
         // 1.1.查询商品
@@ -61,7 +64,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         order.setTotalFee(total);
         // 1.5.其它属性
         order.setPaymentType(orderFormDTO.getPaymentType());
-        order.setUserId(1L);
+        order.setUserId(userId);
         order.setStatus(1);
         // 1.6.将Order写入数据库order表中
         save(order);

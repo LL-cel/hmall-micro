@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.common.exception.BizIllegalException;
 import com.hmall.common.utils.BeanUtils;
+import com.hmall.common.utils.UserContext;
 import com.hmall.pay.domain.dto.PayApplyDTO;
 import com.hmall.pay.domain.dto.PayOrderFormDTO;
 import com.hmall.pay.domain.po.PayOrder;
@@ -37,8 +38,9 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
 
     @Override
     public String applyPayOrder(PayApplyDTO applyDTO) {
+        var userId = UserContext.requireUser();
         // 1.幂等性校验
-        var payOrder = checkIdempotent(applyDTO);
+        var payOrder = checkIdempotent(applyDTO, userId);
         // 2.返回结果
         return payOrder.getId().toString();
     }
@@ -75,13 +77,13 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
     }
 
 
-    private PayOrder checkIdempotent(PayApplyDTO applyDTO) {
+    private PayOrder checkIdempotent(PayApplyDTO applyDTO, Long userId) {
         // 1.首先查询支付单
         var oldOrder = queryByBizOrderNo(applyDTO.getBizOrderNo());
         // 2.判断是否存在
         if (oldOrder == null) {
             // 不存在支付单，说明是第一次，写入新的支付单并返回
-            var payOrder = buildPayOrder(applyDTO);
+            var payOrder = buildPayOrder(applyDTO, userId);
             payOrder.setPayOrderNo(IdWorker.getId());
             save(payOrder);
             return payOrder;
@@ -99,7 +101,7 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
         // 5.旧单已经存在，判断支付渠道是否一致
         if (!StringUtils.equals(oldOrder.getPayChannelCode(), applyDTO.getPayChannelCode())) {
             // 支付渠道不一致，需要重置数据，然后重新申请支付单
-            var payOrder = buildPayOrder(applyDTO);
+            var payOrder = buildPayOrder(applyDTO, userId);
             payOrder.setId(oldOrder.getId());
             payOrder.setQrCodeUrl("");
             updateById(payOrder);
@@ -110,13 +112,13 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
         return oldOrder;
     }
 
-    private PayOrder buildPayOrder(PayApplyDTO payApplyDTO) {
+    private PayOrder buildPayOrder(PayApplyDTO payApplyDTO, Long userId) {
         // 1.数据转换
         var payOrder = BeanUtils.toBean(payApplyDTO, PayOrder.class);
         // 2.初始化数据
         payOrder.setPayOverTime(LocalDateTime.now().plusMinutes(120L));
         payOrder.setStatus(PayStatus.WAIT_BUYER_PAY.getValue());
-        payOrder.setBizUserId(1L);
+        payOrder.setBizUserId(userId);
         return payOrder;
     }
     public PayOrder queryByBizOrderNo(Long bizOrderNo) {

@@ -4,6 +4,7 @@ package com.hmall.user.controller;
 import com.hmall.common.exception.BadRequestException;
 import com.hmall.common.utils.BeanUtils;
 import com.hmall.common.utils.CollUtils;
+import com.hmall.common.utils.UserContext;
 import com.hmall.user.domain.dto.AddressDTO;
 import com.hmall.user.service.IAddressService;
 import io.swagger.annotations.Api;
@@ -35,10 +36,10 @@ public class AddressController {
     @ApiOperation("根据id查询地址")
     @GetMapping("{addressId}")
     public AddressDTO findAddressById(@ApiParam("地址id") @PathVariable("addressId") Long id) {
+        var userId = UserContext.requireUser();
         // 1.根据id查询
         var address = addressService.getById(id);
         // 2.判断当前用户
-        var userId = 1L;
         if(!address.getUserId().equals(userId)){
             throw new BadRequestException("地址不属于当前登录用户");
         }
@@ -48,7 +49,7 @@ public class AddressController {
     @GetMapping
     public List<AddressDTO> findMyAddresses() {
         // 1.查询列表
-        var list = addressService.query().eq("user_id", 1L).list();
+        var list = addressService.query().eq("user_id", UserContext.requireUser()).list();
         // 2.判空
         if (CollUtils.isEmpty(list)) {
             return CollUtils.emptyList();
